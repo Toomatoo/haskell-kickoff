@@ -1,0 +1,2 @@
+# haskell-kickoff
+Haskell Kickoff
