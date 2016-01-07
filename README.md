@@ -1,2 +1,2 @@
-# haskell-kickoff
-Haskell Kickoff
+# Haskell Kickoff
+Let's go Haskell. 
