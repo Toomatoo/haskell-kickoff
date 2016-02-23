@@ -150,3 +150,38 @@ runST (S st) = st 0
 ```
 In standard API, the funtion is `runState :: State s a -> s -> (a, s)`. It means
 you input an initial whole state and get the final state tuple.
+
+
+## Monad Multitask
+
+### Step 1: describe monad with special feature
+```haskell
+class Monad m => MonadExc m where
+  throw :: String -> m a
+class Monad m => MonadST m where
+  runStateST :: m a -> StateST -> m (a, StateST)
+  getST      :: m StateST
+  putST      :: StateST -> m ()
+```
+* revise `m ()` here
+
+    Because `putST` modifies the whole state with a `StateST`, the return type
+    does no work with current state `a`. Therefore, we write the return type is
+    `m ()`.
+### Step 2: Using monad with special feature
+```haskell
+evalMega (Val n)   = return n
+evalMega (Div x y) = do n <- evalMega x
+                        m <- evalMega y
+                        tickST
+                        if m == 0
+                          then throw $ errorS y m
+                          else return $ n `div` m
+```
+For a simple code using both features - `tickST` modifies ticks, `throw` and
+`return` modifies current state.
+
+Here it includes basic implementation of Monad. `tickST`, `throw` and
+`return` are all actions to generate a `Monad b` (`>>= :: M a -> (a -> M b) -> M b`).
+So that `evalMega` need the `ST` running here contains all the features from
+`MonadExc` and `MonadST`.
