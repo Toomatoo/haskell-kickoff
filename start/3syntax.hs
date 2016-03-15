@@ -98,5 +98,5 @@ case expression of pattern -> result
 
 getStr :: [a] -> String
 getStr xs = "The string is " ++ case xs of []  -> "empty."
-                                           [x] -> "simgle element."
+                                           [x] -> "single element."
                                            (a:_) -> "long string"
