@@ -1,16 +1,18 @@
-{-
-Patterns
--}
+# Syntax
 
+## Patterns
 
---Define from up to down, otherwise, overlapping
+Define from up to down, otherwise, overlapping
+```haskell
 lucky :: (Integral a) => a -> String
 --lucky x = "Sorry"
 lucky 1 = "One"
 lucky 2 = "Two"
 lucky x = "Sorry"
+```
 
--- fab :: (Integer a) => a -> a IS WRONG, because Integer is not a typeclass
+`fab :: (Integer a) => a -> a` IS WRONG, because Integer is not a typeclass
+```haskell
 fab :: Int -> Int
 fab 0 = 1
 fab 1 = 1
@@ -46,16 +48,16 @@ length' (_:xs) = 1 + length' xs
 firstLetter :: String -> String
 firstLetter [] = "Empty String"
 firstLetter all@(x:xs) = "The first letter of " ++ all ++ " is " ++ [x]
+```
 
 
 
 
 
-{-
-Guards
--}
+## Guards
 
 
+```haskell
 fat :: (RealFloat a) => a -> a -> String
 fat weight height
     | bmi < skinny  = "Not fat"
@@ -67,11 +69,11 @@ fat weight height
           --normal = 20
           -- They can be rewritten like this
           (skinny, normal) = (10, 20)
+```
 
-{-
-let <bindings> in <expression>
--}
+## let <bindings> in <expression>
 
+```haskell
 surfacearea :: (RealFloat a) => a -> a -> a
 surfacearea r h =
     let sideArea = 2 * pi * r * h
@@ -84,19 +86,21 @@ surfacearea r h =
 -- I can use let in a list and the scope of the bindings is limited
 calcBmis :: (RealFloat a) => [(a, a)] -> [a]
 calcBmis xs = [bmi | (w, h) <- xs, let bmi = w / h ^ 2, bmi >= 25.0]
+```
 
 
 
-{-
-Case statement
-
+## Case statement
+```haskell
 case expression of pattern -> result
                    pattern -> result
                    pattern -> result
                    ...
--}
+```
 
+```haskell
 getStr :: [a] -> String
 getStr xs = "The string is " ++ case xs of []  -> "empty."
                                            [x] -> "single element."
                                            (a:_) -> "long string"
+```

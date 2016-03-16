@@ -1,3 +1,6 @@
+# Function
+
+```haskell
 doubleMe x = x + x
 
 doubleSmaller x = if x > 100
@@ -12,3 +15,4 @@ putBegin x = x : [1, 2]
 
 -- !! operator find the xth element in the list
 getNElem l x = l !! x
+```
