@@ -24,3 +24,6 @@ wtf = do
 baz mmx = do mx <- mmx
              x  <- mx
              return x
+
+
+type A a= Int -> a
