@@ -386,3 +386,117 @@ p `chainl` op = p >>= rest
 when you've done the action of p, then do rest. The work of rest is to continue
 do the action of p. So the processing order is same as left-to-right accessing
 the string.
+
+### Standard Haskell Library Parser
+
+#### Standard Definition
+
+The basic data type for parser is `ParsecT`
+
+```haskell
+data ParsecT s u m a
+type Parsec s u = ParsecT s u Identity
+type Parser = Parsec a ()
+```
+ParsecT s u m a is a parser with stream type `s`, user state type `u`, underlying
+monad `m` and return type `a`. It is defined `Monad (ParsecT s u m)`.
+
+`Parsec` is actually a alias to `ParsecT s u m` with a special monad which I can
+choose to not care now.
+
+`Parser` is a user-friendly type for actual parser definition. For example, with
+`type Parser = Parsec String ()`, the stream type `s = String` and user state
+type is null. Under this situation, we can have a `Parser String`, it means
+return type is `String`, `Parser Expression` which returns a 'Expression', at the
+same time, steam type of this `Parser` is `String` anyway.
+
+Actually, there are lots of `Parser`, like `type Parser = Parsec Text ()`,
+`type Parser = Parsec ByteString ()`.
+
+
+In the standard library, Parser is a type:
+```haskell
+type Parser = Parsec a
+```
+
+#### Implementation of Some String Parser
+
+##### Some functions used
+The parser **try p** behaves like parser p, except that it pretends that it
+hasn't consumed any input when an error occurs.
+```haskell
+try :: ParsecT s u m a -> ParsecT s u m a
+```
+
+**string** parse a input `String` in the stream.
+```haskell
+string :: Stream s m Char => String -> ParsecT s u m String
+```
+
+**many** and **skipMany**
+```haskell
+-- apply zero or more times
+many :: ParsecT s u m a -> ParsecT s u m [a]
+-- apply one or more times
+many1 :: :: ParsecT s u m a -> ParsecT s u m [a]
+-- apply zero or more times, skip the result
+skipMany :: ParsecT s u m a -> ParsecT s u m ()
+-- apply one or more times, skip the result
+skipMany1 :: ParsecT s u m a -> ParsecT s u m ()
+```
+##### Some symbol functions used
+```haskell
+-- return the second function's value
+*> :: f a -> f b -> f b
+-- return the first successful value
+<|> :: f a -> f a -> f a
+```
+
+For example,
+
+```haskell
+statementOne :: Parser Statement
+statementOne =
+    try assignP
+    <|>
+    try ifP
+    <|>
+    try whileP
+    <|>
+    try skipP
+```
+Because `<|>` is implemented by `Applicative Parsec`, if the first parser does
+not consume any content, it will run the next one. This mechanism is determined
+by the implementation of `<|>`.
+
+##### The Principle of Design a Parser
+
+1. Notice where the failure can consume characters which is wrong,
+   Use `try ... <|> try ... <|> ...` to avoid consuming characters.
+2. If you want to parse/skip it many times, like `spaces` or using `many` or
+   `many1`, think about you want to parse (zero or more) times, or (one or more)
+   times.
+
+
+
+*Functor, Applicative, Monad*
+
+**Functor**
+
+`class Functor f where`
+1. `fmap :: (a -> b) -> f a -> f b` <=====> `<$>`
+
+**Applicative**
+
+`class Functor f => Applicative f where`
+1. `pure :: a -> f a`
+2. `<*> :: f (a -> b) -> f a -> f b`
+3. `*> :: f a -> f b -> f b`
+
+
+**Monad**
+
+`class Applicative m => Monad m where`
+1. `(>>=) :: forall a b. m a -> (a -> m b) -> m b`
+2. `(>>) :: forall a b. m a -> m b -> m b`
+3. `return :: a -> m a`

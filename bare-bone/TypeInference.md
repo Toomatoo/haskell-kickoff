@@ -1,6 +1,5 @@
 # Type Inference
 
-[TOC]
 
 Type inference is a bare-bone for Haskell. When you know (define) type of some
 variables or other expressions, we want to infer the type of new define data or
@@ -73,16 +72,16 @@ We define `Type` instance of `Substitutable`. First, do some clarification,
 `apply` will modify a `Type` to a `Type` which means it just do some substitution.
 
 ```haskell
-> instance Substitutable Type where
->   apply _  TInt            = TInt
->   apply _  TBool           = TBool
->   apply su t@(TVar a)      = Map.findWithDefault t a su
->   apply su (t1 `TArr` t2)  = apply su t1 `TArr` apply su t2
->
->   freeTvars TInt           =  Set.empty
->   freeTvars TBool          =  Set.empty
->   freeTvars (TVar a)       =  Set.singleton a
->   freeTvars (t1 `TArr` t2) =  freeTvars t1 `Set.union` freeTvars t2
+instance Substitutable Type where
+  apply _  TInt            = TInt
+  apply _  TBool           = TBool
+  apply su t@(TVar a)      = Map.findWithDefault t a su
+  apply su (t1 `TArr` t2)  = apply su t1 `TArr` apply su t2
+
+  freeTvars TInt           =  Set.empty
+  freeTvars TBool          =  Set.empty
+  freeTvars (TVar a)       =  Set.singleton a
+  freeTvars (t1 `TArr` t2) =  freeTvars t1 `Set.union` freeTvars t2
 ```
 
 And use `scheme` to actually define a complete type. And `scheme` instance of
@@ -91,48 +90,52 @@ variables that are not in `as`, and for `freeTvars` the free variables are
 variables that are not in `as`.
 
 ```haskell
-> instance Substitutable Scheme where
->   apply s (Forall as t)   = Forall as $ apply s' t
->                             where s' = foldr Map.delete s as
->
->   freeTvars (Forall as t) = (freeTvars t) `Set.difference` (Set.fromList as)
+instance Substitutable Scheme where
+  apply s (Forall as t)   = Forall as $ apply s' t
+                            where s' = foldr Map.delete s as
+
+  freeTvars (Forall as t) = (freeTvars t) `Set.difference` (Set.fromList as)
 ```
 
-### Unifier
+After defining a data of a type class, the direct benefit is that we can use
+the functions on the data. After defining instances of `Substitutable`, we can
+use `apply` to substitute some `TVar` in target data, and we can get the free
+type variables from a target data.
+
+### Unifier: alignment
 
 Work for a unifier is to take in two `Type`s, and then output a `Subst` which
 means there are some alignment between `TVar` and `Type`.
 
 So the function signature is that
 ```haskell
-> mgu :: Type -> Type -> HM Subst
+mgu :: Type -> Type -> HM Subst
 ```
 where `HM` is a `State + Error` Monad.
 
 And generally define `mgu`
 ```haskell
-> mgu (l `TArr` r) (l' `TArr` r')  = do  s1 <- mgu l l'
->                                        s2 <- mgu (apply s1 r) (apply s1 r')
->                                        return (s1 `after` s2)
-> mgu (TVar a) t                   = varAsgn a t
-> mgu t (TVar a)                   = varAsgn a t
-> mgu TInt TInt                    = return empSubst
-> mgu TBool TBool                  = return empSubst
-> mgu t1 t2                        = throwError $ "types do not unify: " ++ show t1 ++ " vs. " ++ show t2
+mgu (l `TArr` r) (l' `TArr` r')  = do  s1 <- mgu l l'
+                                       s2 <- mgu (apply s1 r) (apply s1 r')
+                                       return (s1 `after` s2)
+mgu (TVar a) t                   = varAsgn a t
+mgu t (TVar a)                   = varAsgn a t
+mgu TInt TInt                    = return empSubst
+mgu TBool TBool                  = return empSubst
+mgu t1 t2                        = throwError $ "types do not unify: " ++ show t1 ++ " vs. " ++ show t2
 ```
 
 Most simple thing to complete is to align a single `TVar` with a `Type`. The work
 is just to assign the `TVar a` to `Type t`. But there are some details in it.
 ```haskell
-> varAsgn :: TVar -> Type -> HM Subst
-> varAsgn a t
->   | t == TVar a                  =  return empSubst
->   | a `Set.member` (freeTvars t) =  throwError $ "occur check fails: " ++ show a ++ " in " ++ show t
->   | otherwise                    =  return $ Map.singleton a t
+varAsgn :: TVar -> Type -> HM Subst
+varAsgn a t
+  | t == TVar a                  =  return empSubst
+  | a `Set.member` (freeTvars t) =  throwError $ "occur check fails: " ++ show a ++ " in " ++ show t
+  | otherwise                    =  return $ Map.singleton a t
 ```
 If `a` and `t` are same thing, there is no need for a `Subst`. If `a` is a member
-of free variables of `t`, it is a error because there is a recuresive definition?
-`TODO`.
+of free variables of `t`, it is a error because there is a recuresive definition.
 
 For `TArr`, first, I get alignment rules from lefts. then apply the left rules to
 rights. Finally, return a union of left and right rules.
@@ -147,10 +150,10 @@ infer types of actual variables and expressions.
 
 Generalization takes a type `a` and converts it to scheme `Forall a. a`
 ```haskell
-> generalize :: TypeEnv -> Type -> Scheme
-> generalize env t  = Forall as t
->   where
->     as = Set.toList $ (freeTvars t) `Set.difference` (freeTvars env)
+generalize :: TypeEnv -> Type -> Scheme
+generalize env t  = Forall as t
+  where
+    as = Set.toList $ (freeTvars t) `Set.difference` (freeTvars env)
 ```
 
 So that we can see generalization is to generalize the free variables in a `Type`
@@ -159,6 +162,13 @@ and convert it to a scheme.
 Instantiation is to convert a scheme to a type with some fresh variables which
 originally are not free variables.
 
+```haskell
+instantiate :: Scheme -> HM Type
+instantiate (Forall as t) = do
+  as' <- mapM (\ _ -> freshTVar "a") as
+  let s = Map.fromList $ zip as as'
+  return $ apply s t
+```
 
 ### Main Type inference function
 
@@ -170,3 +180,10 @@ bindings for all free variables of the expressions. The output action is a
 state-and-error monad m containing a pair of a substitution which records the
 type constraints imposed on type variables by the expression, and the inferred
 type of the expression.
+
+`TypeEnv`:
+1. Insert: when there is new data variable.
+2. Update: `apply`. you have new substitution map `Subst`.
+
+`Subst`:
+1. Produce new alignment: `mgu` between Types.

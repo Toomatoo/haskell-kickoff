@@ -38,6 +38,7 @@ evalMaybe (Div x y) = do n <- evalMaybe x
       else return (n `div` m)
     ```
     is k.
+
 ### Exception
 
 First, simply change the return into Exception type.
@@ -50,6 +51,8 @@ evalExn (Div x y) = do n <- evalExn x
                            else return (n `div` m)
 ```
 You can see the data type contains two kinds of constructors, `Exn` and `Result`.
+This is actually implementaion for Exception deriving from `Maybe`. We replace
+`Nothing` with `Exn` which takes the error message.
 
 For abstraction, define
 ```haskell
@@ -92,6 +95,9 @@ evalExc (Div x y) = do n <- evalExc x
                        if m == 0
                           then throw  $ errorS y m
                           else return $ n `div` m
+
+throw = Exn
+errorS y m = "Error dividing by " ++ show y ++ " = " ++ show m
 ```
 When exception happened, we throw a error with more information.
 
@@ -108,40 +114,18 @@ tryCatch r@(Result _) _ = r
 
 ### State Monad
 
-### Revise State transformer
-
-For a State transformer
+Count the number of division when evaluating a expression.
 ```haskell
-type StateST = Int
-data ST a = S (StateST -> (a, StateST))
+evalST           :: Expr -> ST Int
+evalST (Val n)   = return n
+evalST (Div x y) = do n <- evalST x
+                      m <- evalST y
+                      tickST
+                      return (n `div` m)
 ```
-Here, it means for this `ST` the State for the whole is `StateST`, and the type
-of state value is `a`.
-```haskell
-instance Monad ST where
-  return x     = S $ \s -> (x, s)
-  (S st) >>= f = S $ \s -> let (x, s') = st s
-                               S st'   = f x
-                           in st' s'
-```
-The fast forward for `ST` is to utilize current state `x` into `f` after `st`
-and return `st' s'`. I mean like we can write this code:
-```haskell
-evalE (Var x) = do
-                s <- get
-                let val = Data.Map.findWithDefault (IntVal 0) x s
-                return val
-```
-`return val` generate a `S st'`, then because it is a fast forward here, the
-mechanism will call `st' s'` as a final step which generate a new tuple, BUT
-based on VITUAL WHOLE STATE (Remember!). So that it is complete for a fast
-forward definition.
-
-Understanding: `ST a` is a function, it accepts a whole state and combine the
-current state in order to make it a tuple. Like return, it combine the current
-state `x` into a tuple with whole state. Note that I call `s` is virtual state
-now, because it is not initialized. As long as it is initialized by runState or
-so, the actual state computation will work.
+For this `ST` the state is `Int` denoting tick time, the return value is `Int`
+denoting the evaluation value. But the problem here is that if `n div m` errors,
+then the program crash, and no ticks is recorded.
 
 ### runST
 ```haskell
@@ -153,6 +137,14 @@ you input an initial whole state and get the final state tuple.
 
 
 ## Monad Multitask
+It seems that I can only use one monad. The direct solution is to implement a
+complex monad data type, and put the all the features needed into this monad.
+But it is obviously a bad idea. If you have add more features into the monad,
+it is hard to accomplish it.
+
+The mechanism to do this is to **use monad to define monad**, then the new monad
+is a set of features you want to add. When you get several new monads, you can
+decorate the monads together as a bunch of features.
 
 ### Step 1: describe monad with special feature
 ```haskell
@@ -163,11 +155,14 @@ class Monad m => MonadST m where
   getST      :: m StateST
   putST      :: StateST -> m ()
 ```
-* revise `m ()` here
+> revise `m ()` here
+> Because `putST` modifies the whole state with a `StateST`, the return type
+> does no work with current state `a`. Therefore, we write the return type is
+> `m ()`.
 
-    Because `putST` modifies the whole state with a `StateST`, the return type
-    does no work with current state `a`. Therefore, we write the return type is
-    `m ()`.
+Notice that **use monad to define monad**, you first need the type `m` a `Monad`
+which wants to be a instance of `MonadST`.
+
 ### Step 2: Using monad with special feature
 ```haskell
 evalMega (Val n)   = return n
@@ -185,3 +180,116 @@ Here it includes basic implementation of Monad. `tickST`, `throw` and
 `return` are all actions to generate a `Monad b` (`>>= :: M a -> (a -> M b) -> M b`).
 So that `evalMega` need the `ST` running here contains all the features from
 `MonadExc` and `MonadST`.
+
+The type of `evalMega` is `(MonadST m, MonadExc m) -> Expr -> m Int`
+
+### Step 3: Injecting Special Features into Monads
+This part is actual how the Haskell deal with multiple Monads. The situation is
+that when we have two monad, then how to decorate it together and keep both of
+the features.
+
+For this part, the lecture actually gets a solution to inject a monad into
+another monad, like inject `ExcT` (Exception) into `STT`(Tick).
+
+### Step 4: Preserve Old Features of Monads
+
+For example, You can promote a Monad back to the monad inside it, like:
+
+```haskell
+instance MonadExc m => MonadExc (STT m) where
+  throw s = promote (throw s)
+```
+
+### Step 5: Put together and Run
+
+With the injection mechanism above, first you can define
+```haskell
+type StEx a = STT  Exc a
+type ExSt a = ExcT ST  a
+```
+
+Then you can use `tick` `throw` and etc at the same time.
+
+## The Monad Transformer Library
+
+### MonadError
+`MonadError` is a type class that has function `throwError` and `catchError`.
+
+`ErrorT e m` and `Either e` is a instance of `MonadError`.
+
+### MonadState
+`MonadState` is a type class that has function `get` and `put`.
+
+`State s` is a instance of `MonadState`.
+
+### Utilize the Monads
+```haskell
+tick :: (MonadState Int m) => m ()
+tick = do {n <- get; put (n+1)}
+
+eval1 :: (MonadError String m, MonadState Int m) => Expr -> m Int
+eval1 (Val n)   = return n
+eval1 (Div x y) = do n   <- eval1 x
+                     m   <- eval1 y
+                     if m == 0
+                        then throwError $ errorS y m
+                        else do tick
+                                return  $ n `div` m
+```
+
+Here we get the evaluation function, from expression to a Monad value. But how
+we can actually run the evaluator?
+
+First we define a stacked monad.
+```haskell
+-- It is mainly a error type, the return value is `a`
+type ES a = ErrorT String (State Int) a
+```
+Second, we define a `run` function
+```haskell
+-- running must correspond to the wrap order of `ES`
+runES :: ES a -> (Either String a, Int)
+runES m = runState (runErrorT m) 0
+
+ghci> runES (evalES ok)
+(Right 42,2)
+
+ghci> runES (evalES err)
+(Left "Error dividing by Div (Val 2) (Val 3) = 0",2)
+```
+So that it first unwrap the outer layer `ErrorT` of the monad `ES`. Then unwrap
+`State`. Then the final `(a, s)` type is `(Either String a, Int)`. We can get
+evaluation result and tick value (it is the return value of `State`)at the same
+time.
+
+However, you can stack them in another order.
+```haskell
+type SE a = State Int (Either String) a
+
+runSE :: SE a -> Either String (a, Int)
+runSE m = runStateT m 0
+
+ghci> runSE (evalSE ok)
+Right (42,2)
+
+ghci> runSE (evalSE err)
+Left "Error dividing by Div (Val 2) (Val 3) = 0"
+```
+**the stack order is very important**, and the result is related with it.
+For `SE`, we first unwrap `State` and get `(a, Int)`. Then unwrap `Either` and
+get `Left` or `Right`. Under this situation, if the result is a `Left`, the
+result from unwrapping `State` will be discarded.
+
+Therefore, the `ErrorT` or `Either` is usually on the top of the stack, which
+makes sure that the sequence unwrapping will not discard other information.
+
+Note: `run*T` if there is a T, it means it run a Monad Transformer, and return a
+monad. Like `runSE` uses `runStateT`. It means it return a `Either String (a, Int)`.
+
+## Some Function for Running State
+
+**execState** :: State s a -> s -> s
+
+**evalState** :: State s a -> s -> a
+
+**runState** :: State s a -> s -> (a, s)

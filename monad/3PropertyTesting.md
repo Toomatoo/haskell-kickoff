@@ -6,10 +6,28 @@ obey.
 
 ## Property
 
+A QuickCheck property is a function whose output is boolean.
+
 Property is mostly a logistic formula which test some property of the result in
 order to see if the formula is true or false.
 
-### ==>
+For example,
+```haskell
+prop_revapp :: [Int] -> [Int] -> Bool
+prop_revapp xs ys = reverse (xs ++ ys) == reverse xs ++ reverse ys
+```
+The type signature for the property is not polymorphic signature. This is
+because QC uses the type to generate random inputs, and hence is restricted to
+monomorphic properties.
+
+```haskell
+squickCheckN   :: (Testable p) => Int -> p -> IO ()
+quickCheckN n = quickCheckWith $ stdArgs { maxSuccess = n }
+```
+
+
+### `==>` Conditional Property
+
 If we do not want to test on some specific test cases, we can use `==>` to
 generate a `Property` which can be used by `quickCheck`.
 
@@ -73,4 +91,109 @@ ghci> quickCheck prop_insert_ordered_vacuous'
  4% 7, not-ord
  4% 5, not-ord
  ...
+```
+
+## Generating Data: Gen
+
+A Haskell term that generates a (random value) of type a has the type `Gen a`
+which is defined as
+```haskell
+newtype Gen a = MkGen { unGen :: StdGen -> Int -> a }
+```
+the term is a function that takes as input a random number generator `StdGen`
+and a seed `Int` and returns an a value. And we can make `Gen` as a `Monad`.
+
+Then you can use `sample` to print some generated values
+```haskell
+sample :: Show a => Gen a -> IO ()
+```
+### Arbitrary
+
+There is type class `Arbitrary` which helps to define `Gen`.
+
+```haskell
+class Arbitrary a where
+  arbitrary :: Gen a
+```
+
+If type `a` is a instance of `Arbitrary`, then we can use `arbitrary` to generate
+random value of `a`.
+
+### Generator Combinators
+
+```haskell
+-- choose between two value of type `a`
+choose :: (System.Random.Random a) => (a, a) -> Gen a
+ghci > sample $ choose (0, 3)
+
+-- choose from a list value of type `a`
+elements :: [a] -> Gen a
+ghci> sample $ elements [10, 20..100]
+
+-- choose from a list generator of type `Gen a`
+oneof :: [Gen a] -> Gen a
+ghci> sample $ oneof [elements [10,20,30], choose (0,3)]
+
+-- choose a generator according to some distribution
+frequency :: [(Int, Gen a)] -> Gen a
+
+```
+
+Implementation of `oneof`
+```haskell
+oneof :: [Gen a] -> Gen a
+oneof [] = error "QuickCheck.oneof used with empty list"
+oneof gs = choose (0,length gs - 1) >>= (gs !!)
+```
+choose a index first, then find the generator.
+
+### Case Study: Generate ordered Lists
+
+First, we can write in a normal logic to generate a List
+```haskell
+genList1 ::  (Arbitrary a) => Gen [a]
+genList1 = liftM2 (:) arbitrary genList1
+
+liftM2 f mx my = do x <- m1
+                    y <- m2
+                    return $ f x y
+```
+But it generates a infinite list.
+
+Second, we make it stop somewhere
+```haskell
+genList2 ::  (Arbitrary a) => Gen [a]
+genList2 = oneof [ return []
+                 , liftM2 (:) arbitrary genList2]
+```
+It is not bad, but we can make it less likely to generate a empty list.
+
+Third,
+```haskell
+genList3 ::  (Arbitrary a) => Gen [a]
+genList3 = frequency [ (1, return [])
+                     , (7, liftM2 (:) arbitrary genList2) ]
+```
+
+Finally, we can sort it with `Function <$>` `<$>` is same as `fmap`
+```haskell
+genOrdList :: (Ord a, Arbitrary a) => Gen [a]
+genOrdList = sort <$> genList3
+
+<$> :: (Functor f) => (a -> b) -> f a -> f b
+```
+
+If you want to check a custom generator we can use `forAll` combinator.
+```haskell
+forAll :: (Show a, Testable prop) => Gen a -> (a -> prop) -> Property
+
+-- Generally, the `prop` is `Bool`
+```
+it accept a custom `Gen a` and a function that first accepts a value of `a`
+(generated from the custom `Gen a`) and returns a property.
+
+To test our `genOrdList` and `isOrdered`
+```haskell
+quickCheckN 1000 (forAll genOrdList isOrdered)
+-- `forAll genOrdList isOrdered` gives us a `Property`
 ```
