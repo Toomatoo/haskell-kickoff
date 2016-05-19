@@ -31,7 +31,7 @@ quickCheckN n = quickCheckWith $ stdArgs { maxSuccess = n }
 If we do not want to test on some specific test cases, we can use `==>` to
 generate a `Property` which can be used by `quickCheck`.
 
-Like, we not want to check on empty list for the function.
+Like, we do not want to check on empty list for the function.
 ```haskell
 prop_qsort_nn_min    :: [Int] -> Property
 prop_qsort_nn_min xs =
@@ -95,7 +95,7 @@ ghci> quickCheck prop_insert_ordered_vacuous'
 
 ## Generating Data: Gen
 
-A Haskell term that generates a (random value) of type a has the type `Gen a`
+A Haskell term that generates `a` (random value) of type `a` has the type `Gen a`
 which is defined as
 ```haskell
 newtype Gen a = MkGen { unGen :: StdGen -> Int -> a }

@@ -13,23 +13,23 @@ Type are special data that is defined how the type inferred can be recorded and
 shown.
 
 ```haskell
-> data Exp     =  EVar EVar            -- x
->              |  ELit Lit             -- 0,1,2,true,false
->              |  EApp Exp Exp         -- e1 e2
->              |  EAbs EVar Exp        -- \x -> e
->              |  ELet EVar Exp Exp    -- let x = e1 in e2
->              |  EPair Exp Exp        -- (e1, e2)
->              deriving (Eq, Ord)
+data Exp     =  EVar EVar            -- x
+          |  ELit Lit             -- 0,1,2,true,false
+          |  EApp Exp Exp         -- e1 e2
+          |  EAbs EVar Exp        -- \x -> e
+          |  ELet EVar Exp Exp    -- let x = e1 in e2
+          |  EPair Exp Exp        -- (e1, e2)
+          deriving (Eq, Ord)
 
-> data Type    =  TVar TVar        -- a
->              |  TInt             -- Int
->              |  TBool            -- Bool
->              |  TArr Type Type   -- t1 -> t2
->              |  TPair Type Type   -- t1 -> t2
->              deriving (Eq, Ord)
->
-> data Scheme  =  Forall [TVar] Type       -- forall a. a -> a -> Bool
-> newtype TypeEnv = TypeEnv (Map.Map EVar Scheme)
+data Type    =  TVar TVar        -- a
+          |  TInt             -- Int
+          |  TBool            -- Bool
+          |  TArr Type Type   -- t1 -> t2
+          |  TPair Type Type   -- t1 -> t2
+          deriving (Eq, Ord)
+
+data Scheme  =  Forall [TVar] Type       -- forall a. a -> a -> Bool
+newtype TypeEnv = TypeEnv (Map.Map EVar Scheme)
 ```
 
 Here we simply define that there are only two primitive types `Int` and `Bool`.
@@ -52,11 +52,11 @@ For example, if we know type variable `a` is `Int`, then when we meet a new type
 
 Therefore, we define a class named Substitutable.
 ```haskell
-> type Subst = Map.Map TVar Type
->
-> class Substitutable a where
->   apply     :: Subst -> a -> a
->   freeTvars :: a -> Set.Set TVar
+type Subst = Map.Map TVar Type
+
+class Substitutable a where
+  apply     :: Subst -> a -> a
+  freeTvars :: a -> Set.Set TVar
 ```
 
 Notice that `Subst` is much similar with `TypeEnv` above, but they are actually

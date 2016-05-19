@@ -48,7 +48,7 @@ evalExn (Div x y) = do n <- evalExn x
                        m <- evalExn y
                        if m == 0
                            then throwExn "EEKES DIVIDED BY ZERO"
-                           else return (n `div` m)
+                       else return (n `div` m)
 ```
 You can see the data type contains two kinds of constructors, `Exn` and `Result`.
 This is actually implementaion for Exception deriving from `Maybe`. We replace
@@ -94,7 +94,7 @@ evalExc (Div x y) = do n <- evalExc x
                        m <- evalExc y
                        if m == 0
                           then throw  $ errorS y m
-                          else return $ n `div` m
+                       else return $ n `div` m
 
 throw = Exn
 errorS y m = "Error dividing by " ++ show y ++ " = " ++ show m
@@ -181,7 +181,7 @@ Here it includes basic implementation of Monad. `tickST`, `throw` and
 So that `evalMega` need the `ST` running here contains all the features from
 `MonadExc` and `MonadST`.
 
-The type of `evalMega` is `(MonadST m, MonadExc m) -> Expr -> m Int`
+The type of `evalMega` is `(MonadST m, MonadExc m) => Expr -> m Int`
 
 ### Step 3: Injecting Special Features into Monads
 This part is actual how the Haskell deal with multiple Monads. The situation is
@@ -205,7 +205,7 @@ instance MonadExc m => MonadExc (STT m) where
 With the injection mechanism above, first you can define
 ```haskell
 type StEx a = STT  Exc a
-type ExSt a = ExcT ST  a
+type ExSt a = ExcT STT a
 ```
 
 Then you can use `tick` `throw` and etc at the same time.
@@ -233,7 +233,7 @@ eval1 (Div x y) = do n   <- eval1 x
                      m   <- eval1 y
                      if m == 0
                         then throwError $ errorS y m
-                        else do tick
+                     else do tick
                                 return  $ n `div` m
 ```
 

@@ -22,8 +22,11 @@ instance Functor [] where
 
 
 Sometimes, we want the map can be applied on multiple parameters, like:
+```haskell
 lift2 :: (a1 -> a2 -> b) -> Maybe a1 -> Maybe a2 -> Maybe b
-lift2 :: (a1 -> a2 -> b) -> IO a1 -> IO a2 -> Maybe b
+lift2 :: (a1 -> a2 -> b) -> IO a1 -> IO a2 -> IO b
+```
+
 And we need these parameters are under same class type for map.
 
 For this reason, there is a typeclass called Applicative that corresponds to the type constructors.
@@ -34,7 +37,9 @@ liftA2 :: Applicative t => (a1 -> a2 -> b) -> t a1 -> t a2 -> t b
 
 ## Monad
 
-Origin: when you are doing a division computation, there are danger div and safe div. When there
+__Origin__
+
+when you are doing a division computation, there are danger div and safe div. When there
 are zero-division happened, the results should be assigned to a special value.
 Under this situation, I need to function whose signature is like this:
 ```haskell
@@ -49,17 +54,17 @@ from more `Maybe`, then you need a mechanism to wrap them all out. However, You
 do not need to write a function with nested tuple type. You just need to make it
 a sequence, which get `x1`, `x2`, ..., `xn` out and generate a `Maybe x`.
 
-With abstraction mentioned above, Haskell implements (>>=) function.
+With abstraction mentioned above, Haskell implements `>>=` function.
 ```haskell
-(>=) :: Maybe a -> (a -> Maybe b) -> Maybe b
-m >= f = case m of
-    Nothing -> Nothing
-    Just x -> f x
+(>>=) :: Maybe a -> (a -> Maybe b) -> Maybe b
+m >>= f = case m of
+            Nothing -> Nothing
+            Just x -> f x
 ```
 This means you unwrap a variable out and then put it into a function and maybe
 do more wraps before generate a final result.
 
-So that the function of (>>=) is like a function that helps us sequence (处理) the parameter
+So that the function of `>>=` is like a function that helps us sequence (处理) the parameter
 before putting them into the target function. And the
 
 ```haskell
@@ -104,9 +109,9 @@ class Applicative m => Monad (m :: * -> *) where
   return :: a -> m a
 ```
 When defining a Monad, you need a subtype `m` which is a instance of Applicative.
-Also, the most important, m must be a type class which accept a type and generate
+Also, the most important, `m` must be a type class which accept a type and generate
 a type. For example, `Maybe` is a type class actually, it need a type `a` to complete
-a define a `Maybe`. And for Monad `Either`, the instance is written like this:
+a definition of a `Maybe`. And for Monad `Either`, the instance is written like this:
 ```haskell
 instance Monad (Either e) where
     return = Right
@@ -114,10 +119,10 @@ instance Monad (Either e) where
     Right r >>= k = k r
 ```
 
-Why you can only make type class `*->*` to a Monad. The reason is that you only
+__Why you can only make type class `*->*` to a Monad?__ The reason is that you only
 need to **sequence** one variable once!
 
-We know complete Either is `Either a b`. But we define `instance Monad (Either e)`
+We know a complete `Either` is `Either a b`. But we define `instance Monad (Either e)`
 here, actually take `b` as a needed type for a complete Either. And logic takes
 advantage of it. `b` (Right) is critical content for Either. `return` of Monad
 Either takes in a `b`, and return `Right b`.
@@ -132,11 +137,10 @@ two constructors.
 ### Logic for Defining a Monad
 
 Monad transfer a monad type to a same monad type, from a list to list, from a Maybe
-to Maybe, from Either to Either. Emphasis it again: monad type is a type class which
+to Maybe, from Either to Either. Emphasize it again: __monad type is a type class which
 needs to accept one more type to generate a complete data type (no `->`).
-
 The change is the underlying type which is needed to generate a complete data
-type, from `List Int` to `List Bool`, from `Maybe Int` to `Maybe Bool`.
+type, from `List Int` to `List Bool`, from `Maybe Int` to `Maybe Bool`.__
 
 ### Monad list
 
@@ -174,7 +178,7 @@ The return work can be shown in the figure below:
 
 ```haskell
 (>>=) :: ST a -> (a -> ST b) -> ST b
-st >= f = \s -> let (x, t') = st t in f x t'
+st >>= f = \s -> let (x, t') = st t in f x t'
 ```
 This means that a inputed state are supposed to be processed by function f.
 
@@ -206,9 +210,9 @@ what combine the sequence of actions of `ST a` and `ST b`. At the same time, the
 variable changed underlying is `State`. It allows us to combine simple actions to
 get bigger actions. `apply` allows us to execute an action with some initial state.
 
-To sum up, an action can be a Monad type. The intuitive idea here is that we can
+To sum up, an action can be a Monad type. The intuitive idea here is that __we can
 get a new action from a old action by Monad bind. Through multiple binds, we can
-get a complex action from a simple action.
+get a complex action from a simple action.__
 
 
 ### Example: Global Counter
@@ -309,8 +313,8 @@ pairP px py = do x <- px
 ```
 
 The reason why in a **do** range, we only need to suck out `x` or `y`, is that
-for binding, the only parameter the function need is a data with type `a`. `x`
-and `y` are the data here. Also, intuitively, the `State (String)` is the underlying
+for binding, __the only parameter the function need is a data with type `a`. `x`
+and `y` are the data here.__ Also, intuitively, the `State (String)` is the underlying
 data within `Monad Parser`, it will be processed during binding, but the action
 is only defined in the definition of instance of `Monad`, so in user functions,
 you do not need to care about `State`.
@@ -398,7 +402,7 @@ data ParsecT s u m a
 type Parsec s u = ParsecT s u Identity
 type Parser = Parsec a ()
 ```
-ParsecT s u m a is a parser with stream type `s`, user state type `u`, underlying
+`ParsecT s u m a` is a parser with stream type `s`, user state type `u`, underlying
 monad `m` and return type `a`. It is defined `Monad (ParsecT s u m)`.
 
 `Parsec` is actually a alias to `ParsecT s u m` with a special monad which I can
@@ -484,11 +488,13 @@ by the implementation of `<|>`.
 **Functor**
 
 `class Functor f where`
+
 1. `fmap :: (a -> b) -> f a -> f b` <=====> `<$>`
 
 **Applicative**
 
 `class Functor f => Applicative f where`
+
 1. `pure :: a -> f a`
 2. `<*> :: f (a -> b) -> f a -> f b`
 3. `*> :: f a -> f b -> f b`
@@ -497,6 +503,7 @@ by the implementation of `<|>`.
 **Monad**
 
 `class Applicative m => Monad m where`
+
 1. `(>>=) :: forall a b. m a -> (a -> m b) -> m b`
 2. `(>>) :: forall a b. m a -> m b -> m b`
 3. `return :: a -> m a`
