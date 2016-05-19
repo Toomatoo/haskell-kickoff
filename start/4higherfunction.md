@@ -42,21 +42,22 @@ ghci> doTwice (3:) [1]
 
 # Anonymous Function
 
-
+```haskell
 f :: Int -> Int -> Int -> Int
 f = \x1 x2 x3 -> x1 + x2 + x3
-
+```
 
 
 ## Infix and Secion
 
 
--- Haskell allows you to use any function as an infix operator, simply by
--- wrapping it inside backticks.
+Haskell allows you to use any function as an infix operator, simply by
+wrapping it inside backticks.
+```haskell
 2 `div` 3
 
 `div` 3 :: Int -> Double
-
+```
 
 
 ## Computation Pattern

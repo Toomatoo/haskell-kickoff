@@ -27,3 +27,6 @@ baz mmx = do mx <- mmx
 
 
 type A a= Int -> a
+
+data Code = C1 Int | C2 String
+                deriving (Show)
